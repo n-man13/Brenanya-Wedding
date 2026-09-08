@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Find Your Table</title>
+  <!-- Google Fonts for Elegant Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- PapaParse for Easy CSV Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <style>
+    :root {
+      --bg-color: #fdfbf7;
+      --card-bg: #ffffff;
+      --primary-text: #2c3e50;
+      --accent-color: #8a735c;
+      --border-color: #e2dcd5;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--primary-text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 40px 28px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 2.2rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+
+    p.subtitle {
+      font-size: 0.95rem;
+      color: #666;
+      margin-bottom: 30px;
+    }
+
+    .search-wrapper {
+      position: relative;
+      margin-bottom: 24px;
+      text-align: left;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #777;
+      margin-bottom: 8px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px 16px;
+      font-size: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      outline: none;
+      transition: all 0.2s ease;
+      background-color: #fafafa;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-color);
+      background-color: #fff;
+      box-shadow: 0 0 0 3px rgba(138, 115, 92, 0.15);
+    }
+
+    .suggestions-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      margin-top: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      z-index: 10;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      display: none;
+    }
+
+    .suggestion-item {
+      padding: 12px 16px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      border-bottom: 1px solid #f5f5f5;
+    }
+
+    .suggestion-item:last-child {
+      border-bottom: none;
+    }
+
+    .suggestion-item:hover, .suggestion-item.active {
+      background-color: #f7f5f2;
+      color: var(--accent-color);
+    }
+
+    .result-card {
+      margin-top: 20px;
+      padding: 24px;
+      background-color: #faf8f5;
+      border-radius: 12px;
+      border: 1px dashed var(--border-color);
+      display: none;
+      animation: fadeIn 0.3s ease-in-out;
+    }
+
+    .result-card .guest-name {
+      font-size: 1.1rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .result-card .table-label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #777;
+    }
+
+    .result-card .table-number {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 3.5rem;
+      font-weight: 600;
+      color: var(--accent-color);
+      line-height: 1.1;
+      margin-top: 4px;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Welcome</h1>
+    <p class="subtitle">Please enter your name to find your table assignment.</p>
+
+    <div class="search-wrapper">
+      <label for="name-input">Your Name</label>
+      <input type="text" id="name-input" placeholder="Type your full name..." autocomplete="off">
+      <div id="suggestions" class="suggestions-list"></div>
+    </div>
+
+    <div id="result-card" class="result-card">
+      <div id="result-name" class="guest-name"></div>
+      <div class="table-label">Table</div>
+      <div id="result-table" class="table-number"></div>
+    </div>
+  </div>
+
+  <script>
+    let seatingData = [];
+
+    // Load CSV file on page start
+    window.addEventListener('DOMContentLoaded', () => {
+      Papa.parse('data.csv', {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+          // Normalize input key names (handles extra spaces around headers)
+          seatingData = results.data.map(row => {
+            const cleanRow = {};
+            Object.keys(row).forEach(key => {
+              cleanRow[key.trim()] = row[key] ? row[key].trim() : '';
+            });
+            return cleanRow;
+          });
+        },
+        error: function(err) {
+          console.error("Could not load seating data:", err);
+        }
+      });
+    });
+
+    const input = document.getElementById('name-input');
+    const suggestions = document.getElementById('suggestions');
+    const resultCard = document.getElementById('result-card');
+    const resultName = document.getElementById('result-name');
+    const resultTable = document.getElementById('result-table');
+
+    input.addEventListener('input', function() {
+      const query = this.value.trim().toLowerCase();
+      suggestions.innerHTML = '';
+      resultCard.style.display = 'none';
+
+      if (query.length < 2) {
+        suggestions.style.display = 'none';
+        return;
+      }
+
+      // Filter matches by full name (case insensitive)
+      const matches = seatingData.filter(item => {
+        const name = item['Full Name'] || '';
+        return name.toLowerCase().includes(query);
+      });
+
+      if (matches.length > 0) {
+        matches.forEach(match => {
+          const div = document.createElement('div');
+          div.className = 'suggestion-item';
+          div.textContent = match['Full Name'];
+          div.addEventListener('click', () => selectGuest(match));
+          suggestions.appendChild(div);
+        });
+        suggestions.style.display = 'block';
+      } else {
+        suggestions.style.display = 'none';
+      }
+    });
+
+    function selectGuest(guest) {
+      input.value = guest['Full Name'];
+      suggestions.style.display = 'none';
+      
+      resultName.textContent = guest['Full Name'];
+      resultTable.textContent = guest['Table Number'] || 'N/A';
+      resultCard.style.display = 'block';
+    }
+
+    // Hide suggestions dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!input.contains(e.target) && !suggestions.contains(e.target)) {
+        suggestions.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>
