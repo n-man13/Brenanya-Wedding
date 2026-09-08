@@ -106,7 +106,7 @@
       padding-right: 4px;
     }
 
-    /* Custom scrollbar for better look */
+    /* Custom scrollbar */
     .results-container::-webkit-scrollbar {
       width: 6px;
     }
@@ -197,16 +197,15 @@
     window.addEventListener('DOMContentLoaded', () => {
       Papa.parse('data.csv', {
         download: true,
-        header: true,
+        header: false, // Set to false because data.csv has no header row
         skipEmptyLines: true,
         complete: function(results) {
-          // Clean headers and trimmed values
+          // Process array rows: index 0 is Name, index 1 is Table Number
           seatingData = results.data.map(row => {
-            const cleanRow = {};
-            Object.keys(row).forEach(key => {
-              cleanRow[key.trim()] = row[key] ? row[key].trim() : '';
-            });
-            return cleanRow;
+            return {
+              name: row[0] ? row[0].trim() : '',
+              table: row[1] ? row[1].trim() : 'N/A'
+            };
           });
         },
         error: function(err) {
@@ -226,10 +225,9 @@
         return;
       }
 
-      // Filter all matches that contain the typed substring anywhere in their full name
+      // Filter matches containing typed query
       const matches = seatingData.filter(item => {
-        const name = item['Full Name'] || '';
-        return name.toLowerCase().includes(query);
+        return item.name.toLowerCase().includes(query);
       });
 
       if (matches.length > 0) {
@@ -239,11 +237,11 @@
 
           card.innerHTML = `
             <div class="result-info">
-              <span class="guest-name">${escapeHtml(match['Full Name'])}</span>
+              <span class="guest-name">${escapeHtml(match.name)}</span>
             </div>
             <div class="table-badge">
               <span class="table-label">Table</span>
-              <span class="table-number">${escapeHtml(match['Table Number'] || 'N/A')}</span>
+              <span class="table-number">${escapeHtml(match.table)}</span>
             </div>
           `;
           resultsContainer.appendChild(card);
@@ -253,7 +251,7 @@
       }
     });
 
-    // Helper to prevent HTML injection issues in names
+    // Helper to prevent HTML injection issues
     function escapeHtml(str) {
       return str.replace(/&/g, "&amp;")
                 .replace(/</g, "&lt;")
