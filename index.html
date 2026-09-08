@@ -7,7 +7,7 @@
   <!-- Google Fonts for Elegant Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
   
   <!-- PapaParse for Easy CSV Parsing -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -43,7 +43,7 @@
       background: var(--card-bg);
       border: 1px solid var(--border-color);
       border-radius: 16px;
-      padding: 40px 28px;
+      padding: 36px 24px;
       width: 100%;
       max-width: 480px;
       box-shadow: var(--shadow);
@@ -62,11 +62,10 @@
     p.subtitle {
       font-size: 0.95rem;
       color: #666;
-      margin-bottom: 30px;
+      margin-bottom: 28px;
     }
 
     .search-wrapper {
-      position: relative;
       margin-bottom: 24px;
       text-align: left;
     }
@@ -98,72 +97,81 @@
       box-shadow: 0 0 0 3px rgba(138, 115, 92, 0.15);
     }
 
-    .suggestions-list {
-      position: absolute;
-      top: 100%;
-      left: 0;
-      right: 0;
-      background: #fff;
-      border: 1px solid var(--border-color);
-      border-radius: 8px;
-      margin-top: 4px;
-      max-height: 200px;
+    .results-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-height: 360px;
       overflow-y: auto;
-      z-index: 10;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-      display: none;
+      padding-right: 4px;
     }
 
-    .suggestion-item {
-      padding: 12px 16px;
-      cursor: pointer;
-      font-size: 0.95rem;
-      border-bottom: 1px solid #f5f5f5;
+    /* Custom scrollbar for better look */
+    .results-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .results-container::-webkit-scrollbar-thumb {
+      background-color: var(--border-color);
+      border-radius: 3px;
     }
 
-    .suggestion-item:last-child {
-      border-bottom: none;
-    }
-
-    .suggestion-item:hover, .suggestion-item.active {
-      background-color: #f7f5f2;
-      color: var(--accent-color);
-    }
-
-    .result-card {
-      margin-top: 20px;
-      padding: 24px;
+    .result-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
       background-color: #faf8f5;
-      border-radius: 12px;
-      border: 1px dashed var(--border-color);
-      display: none;
-      animation: fadeIn 0.3s ease-in-out;
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      text-align: left;
+      animation: fadeIn 0.2s ease-in-out;
     }
 
-    .result-card .guest-name {
-      font-size: 1.1rem;
+    .result-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .guest-name {
+      font-size: 1.05rem;
       font-weight: 500;
-      margin-bottom: 8px;
+      color: var(--primary-text);
     }
 
-    .result-card .table-label {
-      font-size: 0.85rem;
+    .table-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #fff;
+      border: 1px solid var(--border-color);
+      padding: 6px 14px;
+      border-radius: 20px;
+    }
+
+    .table-label {
+      font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 1px;
       color: #777;
     }
 
-    .result-card .table-number {
+    .table-number {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 3.5rem;
-      font-weight: 600;
+      font-size: 1.4rem;
+      font-weight: 700;
       color: var(--accent-color);
-      line-height: 1.1;
-      margin-top: 4px;
+      line-height: 1;
+    }
+
+    .no-results {
+      color: #888;
+      font-size: 0.95rem;
+      padding: 16px;
+      font-style: italic;
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(6px); }
+      from { opacity: 0; transform: translateY(4px); }
       to { opacity: 1; transform: translateY(0); }
     }
   </style>
@@ -172,19 +180,14 @@
 
   <div class="container">
     <h1>Welcome</h1>
-    <p class="subtitle">Please enter your name to find your table assignment.</p>
+    <p class="subtitle">Start typing your name to find your table assignment.</p>
 
     <div class="search-wrapper">
       <label for="name-input">Your Name</label>
-      <input type="text" id="name-input" placeholder="Type your full name..." autocomplete="off">
-      <div id="suggestions" class="suggestions-list"></div>
+      <input type="text" id="name-input" placeholder="Type first or last name..." autocomplete="off">
     </div>
 
-    <div id="result-card" class="result-card">
-      <div id="result-name" class="guest-name"></div>
-      <div class="table-label">Table</div>
-      <div id="result-table" class="table-number"></div>
-    </div>
+    <div id="results-container" class="results-container"></div>
   </div>
 
   <script>
@@ -197,7 +200,7 @@
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
-          // Normalize input key names (handles extra spaces around headers)
+          // Clean headers and trimmed values
           seatingData = results.data.map(row => {
             const cleanRow = {};
             Object.keys(row).forEach(key => {
@@ -213,22 +216,17 @@
     });
 
     const input = document.getElementById('name-input');
-    const suggestions = document.getElementById('suggestions');
-    const resultCard = document.getElementById('result-card');
-    const resultName = document.getElementById('result-name');
-    const resultTable = document.getElementById('result-table');
+    const resultsContainer = document.getElementById('results-container');
 
     input.addEventListener('input', function() {
       const query = this.value.trim().toLowerCase();
-      suggestions.innerHTML = '';
-      resultCard.style.display = 'none';
+      resultsContainer.innerHTML = '';
 
-      if (query.length < 2) {
-        suggestions.style.display = 'none';
+      if (query.length === 0) {
         return;
       }
 
-      // Filter matches by full name (case insensitive)
+      // Filter all matches that contain the typed substring anywhere in their full name
       const matches = seatingData.filter(item => {
         const name = item['Full Name'] || '';
         return name.toLowerCase().includes(query);
@@ -236,33 +234,33 @@
 
       if (matches.length > 0) {
         matches.forEach(match => {
-          const div = document.createElement('div');
-          div.className = 'suggestion-item';
-          div.textContent = match['Full Name'];
-          div.addEventListener('click', () => selectGuest(match));
-          suggestions.appendChild(div);
+          const card = document.createElement('div');
+          card.className = 'result-row';
+
+          card.innerHTML = `
+            <div class="result-info">
+              <span class="guest-name">${escapeHtml(match['Full Name'])}</span>
+            </div>
+            <div class="table-badge">
+              <span class="table-label">Table</span>
+              <span class="table-number">${escapeHtml(match['Table Number'] || 'N/A')}</span>
+            </div>
+          `;
+          resultsContainer.appendChild(card);
         });
-        suggestions.style.display = 'block';
       } else {
-        suggestions.style.display = 'none';
+        resultsContainer.innerHTML = `<div class="no-results">No guests found matching "${escapeHtml(this.value)}"</div>`;
       }
     });
 
-    function selectGuest(guest) {
-      input.value = guest['Full Name'];
-      suggestions.style.display = 'none';
-      
-      resultName.textContent = guest['Full Name'];
-      resultTable.textContent = guest['Table Number'] || 'N/A';
-      resultCard.style.display = 'block';
+    // Helper to prevent HTML injection issues in names
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
     }
-
-    // Hide suggestions dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-      if (!input.contains(e.target) && !suggestions.contains(e.target)) {
-        suggestions.style.display = 'none';
-      }
-    });
   </script>
 </body>
 </html>
